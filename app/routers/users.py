@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from ..auth import hash_password, verify_password, create_token
+from ..auth import hash_password, verify_password, create_token, get_current_user
 
 
 from ..database import get_db
 from ..models import User
-from ..auth import hash_password, verify_password, create_token
+
 
 router = APIRouter(tags=["auth"])
 
@@ -34,3 +34,7 @@ def login(body: Credentials, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     return {"id": user.id, "username": user.username, "token": create_token(user.id)}
+
+@router.get("/me")
+def me(user: User = Depends(get_current_user)):
+    return {"id": user.id, "username": user.username}
