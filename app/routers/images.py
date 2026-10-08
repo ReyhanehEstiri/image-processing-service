@@ -10,8 +10,9 @@ from ..models import Image, User
 from typing import Optional
 from pydantic import BaseModel
 from ..transforms import apply_transformations
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from ..limiter import limiter
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -32,8 +33,11 @@ def to_dict(img: Image) -> dict:
         "size_bytes": img.size_bytes,
         "created_at": img.created_at,
     }
+class ResizeParams(BaseModel):
+    width: int = Field(gt=0, le=4000)
+    height: int = Field(gt=0, le=4000)
 class Transformations(BaseModel):
-    resize: Optional[dict] = None
+    resize: Optional[ResizeParams] = None
     crop: Optional[dict] = None
     rotate: Optional[float] = None
     flip: Optional[bool] = None
@@ -84,8 +88,8 @@ async def upload_image(
 
 @router.get("")
 def list_images(
-    page: int = 1,
-    limit: int = 10,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
