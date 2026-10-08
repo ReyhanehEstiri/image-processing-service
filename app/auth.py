@@ -1,13 +1,11 @@
 import os
 from datetime import datetime, timedelta, timezone
-
 import jwt
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
-
 from .database import get_db
 from .models import User
 
@@ -36,7 +34,6 @@ def create_token(user_id: int) -> str:
 
 
 bearer = HTTPBearer()
-
 
 def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(bearer),
