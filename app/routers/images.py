@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image as PILImage
 from sqlalchemy.orm import Session
-
+from fastapi.responses import FileResponse
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import Image, User
@@ -67,3 +67,36 @@ async def upload_image(
     db.commit()
     db.refresh(record)
     return to_dict(record)
+
+@router.get("")
+def list_images(
+    page: int = 1,
+    limit: int = 10,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Image).filter(Image.owner_id == user.id)
+    total = query.count()
+    items = (
+        query.order_by(Image.id.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "items": [to_dict(i) for i in items],
+    }
+
+@router.get("/{image_id}")
+def get_image(
+    image_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    record = db.get(Image,image_id)
+    if not record or record.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(os.path.join(UPLOAD_DIR, record.filename))
