@@ -2,14 +2,16 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from pwdlib import PasswordHash
-
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import User
+
+load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
 ALGORITHM = "HS256"

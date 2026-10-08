@@ -14,6 +14,9 @@ from typing import Optional
 from pydantic import BaseModel
 from ..transforms import apply_transformations
 
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from ..limiter import limiter
+
 router = APIRouter(prefix="/images", tags=["images"])
 
 UPLOAD_DIR = "uploads"
@@ -117,7 +120,9 @@ def get_image(
     return FileResponse(os.path.join(UPLOAD_DIR, record.filename))
 
 @router.post("/{image_id}/transform", status_code=201)
+@limiter.limit("10/minute")
 def transform_image(
+    request: Request,
     image_id: int,
     body: TransformBody,
     user: User = Depends(get_current_user),

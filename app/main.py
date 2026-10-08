@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from .database import Base, engine
 from . import models
 from .routers import users, images
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from .limiter import limiter
 
 Base.metadata.create_all(bind=engine)
 
