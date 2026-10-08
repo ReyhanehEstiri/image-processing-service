@@ -10,6 +10,10 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..models import Image, User
 
+from typing import Optional
+from pydantic import BaseModel
+from ..transforms import apply_transformations
+
 router = APIRouter(prefix="/images", tags=["images"])
 
 UPLOAD_DIR = "uploads"
@@ -29,7 +33,18 @@ def to_dict(img: Image) -> dict:
         "size_bytes": img.size_bytes,
         "created_at": img.created_at,
     }
+class Transformations(BaseModel):
+    resize: Optional[dict] = None
+    crop: Optional[dict] = None
+    rotate: Optional[float] = None
+    flip: Optional[bool] = None
+    mirror: Optional[bool] = None
+    filters: Optional[dict] = None
+    format: Optional[str] = None
 
+
+class TransformBody(BaseModel):
+    transformations: Transformations
 
 @router.post("", status_code=201)
 async def upload_image(
@@ -100,3 +115,47 @@ def get_image(
     if not record or record.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(os.path.join(UPLOAD_DIR, record.filename))
+
+@router.post("/{image_id}/transform", status_code=201)
+def transform_image(
+    image_id: int,
+    body: TransformBody,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    record = db.get(Image, image_id)
+    if not record or record.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    t = body.transformations.model_dump(exclude_none=True)
+    pil_img = PILImage.open(os.path.join(UPLOAD_DIR, record.filename))
+
+    try:
+        result = apply_transformations(pil_img, t)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Transformation failed: {e}")
+
+    fmt = t.get("format", record.format).upper()
+    if fmt == "JPG":
+        fmt = "JPEG"
+    if fmt not in ALLOWED_FORMATS:
+        raise HTTPException(status_code=400, detail="Allowed formats: JPEG, PNG, WEBP")
+    if fmt == "JPEG":
+        result = result.convert("RGB")
+
+    filename = f"{uuid.uuid4().hex}.{fmt.lower()}"
+    path = os.path.join(UPLOAD_DIR, filename)
+    result.save(path, fmt)
+
+    new_record = Image(
+        owner_id=user.id,
+        filename=filename,
+        format=fmt,
+        width=result.width,
+        height=result.height,
+        size_bytes=os.path.getsize(path),
+    )
+    db.add(new_record)
+    db.commit()
+    db.refresh(new_record)
+    return to_dict(new_record)
